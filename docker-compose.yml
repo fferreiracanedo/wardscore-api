@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: wardscore_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wardscore
+      POSTGRES_USER: warduser
+      POSTGRES_PASSWORD: wardpass123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - wardscore_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warduser -d wardscore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: wardscore_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - wardscore_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # API Go Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # Usar target de desenvolvimento
+    container_name: wardscore_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://warduser:wardpass123@postgres:5432/wardscore?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=wardscore_super_secret_key_development_2024_muito_longa_e_segura
+      - DEBUG=true
+      - GIN_MODE=debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+    networks:
+      - wardscore_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Adminer (Interface web para PostgreSQL) - Opcional
+  adminer:
+    image: adminer:latest
+    container_name: wardscore_adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    networks:
+      - wardscore_network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  go_mod_cache:
+    driver: local
+
+networks:
+  wardscore_network:
+    driver: bridge

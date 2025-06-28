@@ -1,0 +1,42 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Environment variables
+.env
+
+# Go specific
+/vendor/
+/go.work
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+redis_data/
+go_mod_cache/
+
+# Temporary files
+tmp/
+temp/
+
+# Air
+tmp/
+*.log
+
+# Build
+bin/
+dist/ 
